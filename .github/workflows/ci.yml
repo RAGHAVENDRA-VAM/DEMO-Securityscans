@@ -9,37 +9,51 @@ jobs:
 
     steps:
 
-    # 1️⃣ Checkout Repo
+    # --------------------------------
+    # 1️⃣ Checkout Repository
+    # --------------------------------
     - name: Checkout Repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
+    # --------------------------------
     # 2️⃣ Create Timestamp Folder
+    # --------------------------------
     - name: Create Report Folder
       run: |
         TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
         REPO_NAME=${{ github.event.repository.name }}
-        REPORT_DIR="reports/$REPO_NAME/$TIMESTAMP"
+        BRANCH_NAME=${{ github.ref_name }}
+
+        REPORT_DIR="reports/$REPO_NAME/$BRANCH_NAME/$TIMESTAMP"
         mkdir -p $REPORT_DIR
+
         echo "REPORT_DIR=$REPORT_DIR" >> $GITHUB_ENV
         echo "SCAN_TIME=$TIMESTAMP" >> $GITHUB_ENV
         echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
+    # --------------------------------
     # 3️⃣ Install Semgrep
+    # --------------------------------
     - name: Install Semgrep
       run: pip install semgrep
 
-    # 4️⃣ Run Semgrep
+    # --------------------------------
+    # 4️⃣ Run Semgrep Scan
+    # --------------------------------
     - name: Run Semgrep
       run: |
         semgrep scan . \
           --config auto \
           --json > $REPORT_DIR/semgrep-report.json || true
 
-    # 5️⃣ Run Trivy (Official Action)
+    # --------------------------------
+    # 5️⃣ Run Trivy Scan
+    # --------------------------------
     - name: Run Trivy
-      uses: aquasecurity/trivy-action@v0.20.0
+      uses: aquasecurity/trivy-action@0.24.0
       with:
         scan-type: fs
         scan-ref: .
@@ -47,22 +61,28 @@ jobs:
         output: ${{ env.REPORT_DIR }}/trivy-report.json
       continue-on-error: true
 
-    # 6️⃣ Run Gitleaks (Official Action)
+    # --------------------------------
+    # 6️⃣ Run Gitleaks Scan
+    # --------------------------------
     - name: Run Gitleaks
       uses: gitleaks/gitleaks-action@v2
       with:
         args: detect --source . --report-format json --report-path ${{ env.REPORT_DIR }}/gitleaks-report.json
       continue-on-error: true
 
-    # 7️⃣ Add Metadata
+    # --------------------------------
+    # 7️⃣ Add Metadata File
+    # --------------------------------
     - name: Add Metadata
       run: |
         echo "Repository: $REPO_NAME" > $REPORT_DIR/scan-info.txt
-        echo "Branch: ${{ github.ref_name }}" >> $REPORT_DIR/scan-info.txt
+        echo "Branch: $BRANCH_NAME" >> $REPORT_DIR/scan-info.txt
         echo "Commit: ${{ github.sha }}" >> $REPORT_DIR/scan-info.txt
         echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
 
+    # --------------------------------
     # 8️⃣ Azure Login
+    # --------------------------------
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -70,7 +90,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-    # 9️⃣ Upload to Azure Blob
+    # --------------------------------
+    # 9️⃣ Upload Reports to Azure Blob
+    # --------------------------------
     - name: Upload Reports to Azure Blob
       run: |
         az storage blob upload-batch \
