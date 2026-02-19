@@ -26,46 +26,35 @@ jobs:
         echo "SCAN_TIME=$TIMESTAMP" >> $GITHUB_ENV
         echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
 
-    # 3️⃣ Install Tools
+    # 3️⃣ Install Semgrep
     - name: Install Semgrep
       run: pip install semgrep
 
-    - name: Install Trivy
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget gnupg lsb-release
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-        echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install -y trivy
-
-    - name: Install Gitleaks
-      run: |
-        wget https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.18.2_linux_x64.tar.gz
-        tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
-        sudo mv gitleaks /usr/local/bin/
-
-    # 4️⃣ Run Scans
+    # 4️⃣ Run Semgrep
     - name: Run Semgrep
       run: |
         semgrep scan . \
           --config auto \
           --json > $REPORT_DIR/semgrep-report.json || true
 
+    # 5️⃣ Run Trivy (Official Action)
     - name: Run Trivy
-      run: |
-        trivy fs . \
-          --format json \
-          --output $REPORT_DIR/trivy-report.json || true
+      uses: aquasecurity/trivy-action@v0.20.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        format: json
+        output: ${{ env.REPORT_DIR }}/trivy-report.json
+      continue-on-error: true
 
+    # 6️⃣ Run Gitleaks (Official Action)
     - name: Run Gitleaks
-      run: |
-        gitleaks detect \
-          --source . \
-          --report-format json \
-          --report-path $REPORT_DIR/gitleaks-report.json || true
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        args: detect --source . --report-format json --report-path ${{ env.REPORT_DIR }}/gitleaks-report.json
+      continue-on-error: true
 
-    # 5️⃣ Add Metadata
+    # 7️⃣ Add Metadata
     - name: Add Metadata
       run: |
         echo "Repository: $REPO_NAME" > $REPORT_DIR/scan-info.txt
@@ -73,7 +62,7 @@ jobs:
         echo "Commit: ${{ github.sha }}" >> $REPORT_DIR/scan-info.txt
         echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
 
-    # 6️⃣ Azure Login
+    # 8️⃣ Azure Login
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -81,7 +70,7 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-    # 7️⃣ Upload to Azure Blob
+    # 9️⃣ Upload to Azure Blob
     - name: Upload Reports to Azure Blob
       run: |
         az storage blob upload-batch \
