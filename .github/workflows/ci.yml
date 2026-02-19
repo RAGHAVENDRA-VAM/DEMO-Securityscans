@@ -9,17 +9,13 @@ jobs:
 
     steps:
 
-    # --------------------------------
-    # 1️⃣ Checkout Current GitHub Repo
-    # --------------------------------
+    # 1️⃣ Checkout Repo
     - name: Checkout Repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    # --------------------------------
     # 2️⃣ Create Timestamp Folder
-    # --------------------------------
     - name: Create Report Folder
       run: |
         TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -30,17 +26,18 @@ jobs:
         echo "SCAN_TIME=$TIMESTAMP" >> $GITHUB_ENV
         echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
 
-    # --------------------------------
-    # 3️⃣ Install Security Tools
-    # --------------------------------
+    # 3️⃣ Install Tools
     - name: Install Semgrep
       run: pip install semgrep
 
     - name: Install Trivy
       run: |
-        sudo apt-get install wget -y
-        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.1_Linux-64bit.deb
-        sudo dpkg -i trivy_0.50.1_Linux-64bit.deb
+        sudo apt-get update
+        sudo apt-get install -y wget gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install -y trivy
 
     - name: Install Gitleaks
       run: |
@@ -48,9 +45,7 @@ jobs:
         tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
         sudo mv gitleaks /usr/local/bin/
 
-    # --------------------------------
-    # 4️⃣ Run Scans On Current Repo
-    # --------------------------------
+    # 4️⃣ Run Scans
     - name: Run Semgrep
       run: |
         semgrep scan . \
@@ -70,9 +65,7 @@ jobs:
           --report-format json \
           --report-path $REPORT_DIR/gitleaks-report.json || true
 
-    # --------------------------------
-    # 5️⃣ Add Metadata File
-    # --------------------------------
+    # 5️⃣ Add Metadata
     - name: Add Metadata
       run: |
         echo "Repository: $REPO_NAME" > $REPORT_DIR/scan-info.txt
@@ -80,9 +73,7 @@ jobs:
         echo "Commit: ${{ github.sha }}" >> $REPORT_DIR/scan-info.txt
         echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
 
-    # --------------------------------
     # 6️⃣ Azure Login
-    # --------------------------------
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -90,9 +81,7 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-    # --------------------------------
-    # 7️⃣ Upload Reports to Azure Blob
-    # --------------------------------
+    # 7️⃣ Upload to Azure Blob
     - name: Upload Reports to Azure Blob
       run: |
         az storage blob upload-batch \
