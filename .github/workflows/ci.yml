@@ -80,16 +80,24 @@ jobs:
         echo "Commit: ${{ github.sha }}" >> $REPORT_DIR/scan-info.txt
         echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
 
-    # --------------------------------
-    # 8️⃣ Azure Login (Correct Method)
+       # --------------------------------
+    # 8️⃣ Azure Login
     # --------------------------------
     - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-       # --------------------------------
-    # 9️⃣ Upload Reports to Azure Blob (FIXED)
+    # --------------------------------
+    # 9️⃣ Set Correct Subscription
+    # --------------------------------
+    - name: Set Subscription
+      run: |
+        az account set --subscription 46269e09-e1e1-4067-af90-78fd27b1b64d
+        az account show --output table
+
+    # --------------------------------
+    # 🔟 Upload Reports to Azure Blob (FIXED)
     # --------------------------------
     - name: Upload Reports to Azure Blob
       run: |
@@ -104,5 +112,3 @@ jobs:
           --auth-mode login \
           --overwrite
 
-          --source $REPORT_DIR \
-          --overwrite
