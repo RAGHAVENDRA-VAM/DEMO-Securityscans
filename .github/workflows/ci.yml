@@ -88,13 +88,21 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    # --------------------------------
-    # 9️⃣ Upload Reports to Azure Blob
+       # --------------------------------
+    # 9️⃣ Upload Reports to Azure Blob (FIXED)
     # --------------------------------
     - name: Upload Reports to Azure Blob
       run: |
+        echo "Checking Storage Account..."
+        az storage account show --name gaigkyc
+
+        echo "Uploading reports..."
         az storage blob upload-batch \
           --account-name gaigkyc \
           --destination securityscanreports \
+          --source $REPORT_DIR \
+          --auth-mode login \
+          --overwrite
+
           --source $REPORT_DIR \
           --overwrite
