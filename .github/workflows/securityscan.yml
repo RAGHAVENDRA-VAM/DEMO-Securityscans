@@ -1,0 +1,113 @@
+name: GitHub Security Scan with Azure Upload
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    # --------------------------------
+    # 1️⃣ Checkout Repository
+    # --------------------------------
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # --------------------------------
+    # 2️⃣ Create Timestamp Folder
+    # --------------------------------
+    - name: Create Report Folder
+      run: |
+        TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+        REPO_NAME=${{ github.event.repository.name }}
+        BRANCH_NAME=${{ github.ref_name }}
+
+        REPORT_DIR="reports/$REPO_NAME/$BRANCH_NAME/$TIMESTAMP"
+        mkdir -p $REPORT_DIR
+
+        echo "REPORT_DIR=$REPORT_DIR" >> $GITHUB_ENV
+        echo "SCAN_TIME=$TIMESTAMP" >> $GITHUB_ENV
+        echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+    # --------------------------------
+    # 3️⃣ Install Semgrep
+    # --------------------------------
+    - name: Install Semgrep
+      run: pip install semgrep
+
+    # --------------------------------
+    # 4️⃣ Run Semgrep Scan
+    # --------------------------------
+    - name: Run Semgrep
+      run: |
+        semgrep scan . \
+          --config auto \
+          --json > $REPORT_DIR/semgrep-report.json || true
+
+    # --------------------------------
+    # 5️⃣ Run Trivy Scan
+    # --------------------------------
+    - name: Run Trivy
+      uses: aquasecurity/trivy-action@0.24.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        format: json
+        output: ${{ env.REPORT_DIR }}/trivy-report.json
+      continue-on-error: true
+
+    # --------------------------------
+    # 6️⃣ Run Gitleaks Scan
+    # --------------------------------
+    - name: Run Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        args: detect --source . --report-format json --report-path ${{ env.REPORT_DIR }}/gitleaks-report.json
+      continue-on-error: true
+
+    # --------------------------------
+    # 7️⃣ Add Metadata File
+    # --------------------------------
+    - name: Add Metadata
+      run: |
+        echo "Repository: $REPO_NAME" > $REPORT_DIR/scan-info.txt
+        echo "Branch: $BRANCH_NAME" >> $REPORT_DIR/scan-info.txt
+        echo "Commit: ${{ github.sha }}" >> $REPORT_DIR/scan-info.txt
+        echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
+
+       # --------------------------------
+    # 8️⃣ Azure Login
+    # --------------------------------
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # --------------------------------
+    # 9️⃣ Set Correct Subscription
+    # --------------------------------
+    - name: Set Subscription
+      run: |
+        az account set --subscription 46269e09-e1e1-4067-af90-78fd27b1b64d
+        az account show --output table
+
+    # --------------------------------
+    # 🔟 Upload Reports to Azure Blob (FIXED)
+    # --------------------------------
+    - name: Upload Reports to Azure Blob
+      run: |
+        echo "Checking Storage Account..."
+        az storage account show --name gaigkyc
+
+        echo "Uploading reports..."
+        az storage blob upload-batch \
+          --account-name gaigkyc \
+          --destination securityscanreports \
+          --source $REPORT_DIR \
+          --auth-mode login \
+          --overwrite
