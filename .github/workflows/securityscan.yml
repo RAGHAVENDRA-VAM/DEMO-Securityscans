@@ -10,7 +10,7 @@ jobs:
     steps:
 
     # --------------------------------
-    # 1️⃣ Checkout Repository
+    # 1️ Checkout Repository
     # --------------------------------
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -18,7 +18,7 @@ jobs:
         fetch-depth: 0
 
     # --------------------------------
-    # 2️⃣ Create Timestamp Folder
+    # 2️ Create Timestamp Folder
     # --------------------------------
     - name: Create Report Folder
       run: |
@@ -35,13 +35,13 @@ jobs:
         echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
     # --------------------------------
-    # 3️⃣ Install Semgrep
+    # 3️ Install Semgrep
     # --------------------------------
     - name: Install Semgrep
       run: pip install semgrep
 
     # --------------------------------
-    # 4️⃣ Run Semgrep Scan
+    # 4️ Run Semgrep Scan
     # --------------------------------
     - name: Run Semgrep
       run: |
@@ -50,7 +50,7 @@ jobs:
           --json > $REPORT_DIR/semgrep-report.json || true
 
     # --------------------------------
-    # 5️⃣ Run Trivy Scan
+    # 5️ Run Trivy Scan
     # --------------------------------
     - name: Run Trivy
       uses: aquasecurity/trivy-action@0.24.0
@@ -62,7 +62,7 @@ jobs:
       continue-on-error: true
 
     # --------------------------------
-    # 6️⃣ Run Gitleaks Scan
+    # 6️ Run Gitleaks Scan
     # --------------------------------
     - name: Run Gitleaks
       uses: gitleaks/gitleaks-action@v2
@@ -71,7 +71,7 @@ jobs:
       continue-on-error: true
 
     # --------------------------------
-    # 7️⃣ Add Metadata File
+    # 7️ Add Metadata File
     # --------------------------------
     - name: Add Metadata
       run: |
@@ -81,7 +81,7 @@ jobs:
         echo "Scan Date: $SCAN_TIME" >> $REPORT_DIR/scan-info.txt
 
        # --------------------------------
-    # 8️⃣ Azure Login
+    # 8️ Azure Login
     # --------------------------------
     - name: Azure Login
       uses: azure/login@v1
@@ -89,7 +89,7 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     # --------------------------------
-    # 9️⃣ Set Correct Subscription
+    # 9️ Set Correct Subscription
     # --------------------------------
     - name: Set Subscription
       run: |
@@ -97,7 +97,7 @@ jobs:
         az account show --output table
 
     # --------------------------------
-    # 🔟 Upload Reports to Azure Blob (FIXED)
+    #  Upload Reports to Azure Blob (FIXED)
     # --------------------------------
     - name: Upload Reports to Azure Blob
       run: |
